@@ -1,0 +1,48 @@
+apply plugin: 'maven-publish'
+
+gradle.allprojects {
+    ext.addDependencies = { dependency, dependenciesNode ->
+        if (dependency.name == "unspecified") return
+        def dependencyNode = dependenciesNode.appendNode('dependency')
+        dependencyNode.appendNode('groupId', dependency.group)
+        dependencyNode.appendNode('artifactId', dependency.name)
+        dependencyNode.appendNode('version', dependency.version)
+        dependency.artifacts.each {
+            dependencyNode.appendNode('type', it.type)
+        }
+
+        def exclusionsNode = dependencyNode.appendNode('exclusions')
+        dependency.excludeRules.each {
+            def exclusionNode = exclusionsNode.appendNode('exclusion')
+            exclusionNode.appendNode('groupId', it.group)
+            exclusionNode.appendNode('artifactId', it.module)
+        }
+        if (!dependency.isTransitive()) {
+            def exclusionNode = exclusionsNode.appendNode('exclusion')
+            exclusionNode.appendNode('groupId', '*')
+            exclusionNode.appendNode('artifactId', '*')
+        }
+    }
+
+    ext.generatePom = { pom, currentConfigurationName ->
+        pom.withXml {
+            def dependenciesNode = asNode().appendNode('dependencies')
+            configurations.compile.allDependencies.each { addDependencies(it, dependenciesNode) }
+            configurations.getByName(currentConfigurationName).allDependencies.each {
+                addDependencies(it, dependenciesNode)
+            }
+        }
+    }
+
+    ext.generatePom = { pom ->
+        pom.withXml {
+            def dependenciesNode = asNode().appendNode('dependencies')
+            configurations.compile.allDependencies.each { addDependencies(it, dependenciesNode) }
+        }
+    }
+
+    task sourceJar(type: Jar) {
+        from android.sourceSets.main.java.srcDirs
+        classifier "sources"
+    }
+}
